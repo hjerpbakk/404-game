@@ -171,10 +171,10 @@
           if (score > highScore) {
             highScore = score;
             localStorage.setItem("highScore", highScore.toString());
-            drawHighScore();
             text = " Highscore!";
           }
 
+          drawHighScore();
           gameOver = true;
           drawGameOverScreen(text);
           return;
