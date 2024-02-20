@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404-game</title>
+    <meta property="og:title" content="404-game" />
+    <meta name="description" content="The right game for the wrong URL!" />
+    <meta
+      property="og:description"
+      content="The right game for the wrong URL!"
+    />
+    <meta property="og:image" content="/img/404-screen.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5" />
+    <meta name="msapplication-TileColor" content="#da532c" />
+    <meta name="theme-color" content="#ffffff" />
+    <style>
+      canvas {
+        background: lightblue;
+        cursor: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+    <script>
+      let debug = false;
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const truckEmoji = "🚚";
+      const moneyEmojis = ["💵", "💶", "💷", "💰"];
+      const heartEmoji = "❤️";
+      const trashEmoji = "🗑️";
+      const scores = { "💵": 10, "💶": 20, "💷": 30, "💰": 50 };
+      let lives = 3;
+      let score = 0;
+      let highScore = Number(localStorage.getItem("highScore") || 0);
+      let money = [];
+      let particles = [];
+      let truck = { x: 400, y: 550, width: 30, height: 20 };
+      const emojiSize = 30;
+      let fallSpeed = 2;
+      let gameOver = false;
+
+      document.addEventListener("DOMContentLoaded", (event) => {
+        document.addEventListener("mousemove", moveTruck);
+        document.addEventListener("click", function () {
+          if (gameOver) {
+            resetGame();
+          }
+        });
+        setInterval(dropMoney, 1000);
+        dropMoney();
+      });
+
+      function moveTruck(e) {
+        const rect = canvas.getBoundingClientRect();
+        truck.x = e.clientX - rect.left - truck.width / 2;
+        if (truck.x < 0) truck.x = 0;
+        if (truck.x + truck.width > canvas.width)
+          truck.x = canvas.width - truck.width;
+      }
+
+      function dropMoney() {
+        const x = Math.random() * (canvas.width - 30);
+        const emoji =
+          moneyEmojis[Math.floor(Math.random() * moneyEmojis.length)];
+        money.push({ x, y: 0, emoji, isTrash: false });
+      }
+
+      function addParticle(x, y) {
+        const particleCount = 10;
+        for (let i = 0; i < particleCount; i++) {
+          particles.push({
+            x,
+            y,
+            speedX: (Math.random() - 0.5) * 2,
+            speedY: (Math.random() - 0.5) * 2,
+            size: Math.random() * 5 + 5,
+            color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+          });
+        }
+      }
+
+      function adjustDifficulty() {
+        if (score > 1000) fallSpeed = 20;
+        else if (score > 900) fallSpeed = 15;
+        else if (score > 800) fallSpeed = 11;
+        else if (score > 700) fallSpeed = 9;
+        else if (score > 600) fallSpeed = 7;
+        else if (score > 500) fallSpeed = 5;
+        else if (score > 400) fallSpeed = 4;
+        else if (score > 300) fallSpeed = 3;
+        else if (score > 200) fallSpeed = 2.5;
+        else if (score > 150) fallSpeed = 2.3;
+        else if (score > 100) fallSpeed = 2.2;
+        else if (score > 50) fallSpeed = 2.1;
+      }
+
+      function updateGame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw ground
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+
+        // Draw truck
+        ctx.font = "30px Arial";
+        ctx.fillText(truckEmoji, truck.x, truck.y);
+
+        // Draw money and check for collisions
+        money.forEach((m, index) => {
+          m.y += fallSpeed;
+          const emoji = m.isTrash ? trashEmoji : m.emoji;
+          ctx.fillText(emoji, m.x, m.y);
+
+          if (m.y > canvas.height - 50 && !m.isTrash) {
+            m.isTrash = true;
+            setTimeout(() => {
+              money.splice(index, 1);
+            }, 2000); // Remove after 2 seconds
+            lives -= 1;
+          }
+
+          // Collision detection
+          if (
+            m.y > truck.y - truck.height &&
+            m.y - emojiSize < truck.y &&
+            m.x + emojiSize > truck.x &&
+            m.x < truck.x + truck.width
+          ) {
+            score += scores[m.emoji]; // Update score based on emoji
+            addParticle(m.x + emojiSize / 2, truck.y); // Create particles at the center of the emoji
+            money.splice(index, 1); // Remove emoji after collection
+            adjustDifficulty();
+          }
+        });
+
+        // Draw particles
+        particles.forEach((p, index) => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+
+          p.size -= 0.1;
+          if (p.size <= 0) particles.splice(index, 1);
+        });
+
+        // Draw HUD
+        ctx.fillStyle = "black";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(`Score: ${score}`, 10, 30);
+        ctx.fillText(
+          `Lives: ${heartEmoji.repeat(lives)}`,
+          canvas.width - 150,
+          30
+        );
+
+        // Check for game over
+        if (lives <= 0) {
+          let text = "Game Over";
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem("highScore", highScore.toString());
+            drawHighScore();
+            text = " Highscore!";
+          }
+
+          gameOver = true;
+          drawGameOverScreen(text);
+          return;
+        }
+
+        drawHighScore();
+        requestAnimationFrame(updateGame);
+      }
+
+      function drawHighScore() {
+        ctx.fillText(`Highscore: ${highScore}`, 10, 60);
+      }
+
+      function drawGameOverScreen(text) {
+        ctx.fillStyle = "black";
+        ctx.font = "36px Arial";
+        ctx.fillText(text, canvas.width / 2 - 100, canvas.height / 2);
+        ctx.font = "24px Arial";
+        ctx.fillText(
+          "Click to try again",
+          canvas.width / 2 - 95,
+          canvas.height / 2 + 40
+        );
+      }
+
+      function resetGame() {
+        score = 0;
+        lives = 3;
+        money = [];
+        particles = [];
+        fallSpeed = 2;
+        gameOver = false;
+        requestAnimationFrame(updateGame);
+      }
+
+      document.addEventListener("mousemove", moveTruck);
+      document.addEventListener("click", function () {
+        if (gameOver) {
+          resetGame();
+        }
+      });
+      updateGame();
+    </script>
+  </body>
+</html>
